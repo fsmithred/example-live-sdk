@@ -1,0 +1,170 @@
+#!/usr/bin/env zsh
+# Copyright (c) 2016-2017 Dyne.org Foundation
+# libdevuansdk maintained by Ivan J. <parazyd@dyne.org>
+#
+# This file is part of libdevuansdk
+#
+# This source code is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this source code. If not, see <http://www.gnu.org/licenses/>.
+
+vars+=(bootstrap_tgz)
+
+bootstrap_complete_base() {
+	fn bootstrap_complete_base "$@"
+	req=(arch)
+	ckreq || return 1
+
+	notice "bootstrapping $os $arch base"
+
+	bootstrap_tgz="$R/tmp/bootstrap-${os}-${arch}.tgz"
+
+	[[ -f $bootstrap_tgz ]] && {
+		notice "using the existing bootstrap tarball found in $R/tmp"
+		bootstrap_tar_unpack $strapdir || { die "failed to extract"; zerr }
+		return 0
+	}
+	notice "running debootstrap stage 1"
+	## deboostrap stage 1
+	export LANG=C
+	export LC_ALL=C
+	export DEBIAN_FRONTEND=noninteractive
+
+	sudo -E debootstrap \
+		--foreign \
+		--arch $arch $release $strapdir $mirror || zerr
+
+	[[ $arch =~ "^arm.." ]] && { qemu_install_user || zerr }
+
+	sudo mkdir -p $strapdir/tmp
+	sudo chmod 1777 $strapdir/tmp
+
+	## debootstrap stage 2
+	notice "running debootstrap stage 2"
+	sudo -E chroot $strapdir \
+		/debootstrap/debootstrap --second-stage || zerr
+
+	## write all system configuration
+	notice "writing system configuration"
+	conf_print_debconf     | sudo tee $strapdir/debconf.set              >/dev/null
+	conf_print_fstab       | sudo tee $strapdir/etc/fstab                >/dev/null
+	conf_print_hostname    | sudo tee $strapdir/etc/hostname             >/dev/null
+	conf_print_hosts       | sudo tee $strapdir/etc/hosts                >/dev/null
+	conf_print_netifaces   | sudo tee $strapdir/etc/network/interfaces   >/dev/null
+	conf_print_resolvconf  | sudo tee $strapdir/etc/resolv.conf          >/dev/null
+	conf_print_sourceslist | sudo tee $strapdir/etc/apt/sources.list     >/dev/null
+	conf_print_locales     | sudo tee $strapdir/etc/profile.d/locales.sh >/dev/null
+
+	## write third-stage for chroot
+	bootstrap_config_thirdstage | sudo tee $strapdir/thirdstage >/dev/null
+
+	## chroot into it and configure further
+	## debootstrap stage 3
+	notice "running debootstrap stage 3"
+
+
+	chroot-script -d thirdstage || zerr
+	sleep 1
+
+	bootstrap_tar_pack             || zerr
+	bootstrap_tar_unpack $strapdir || zerr
+}
+
+bootstrap_config_thirdstage() {
+	fn bootstrap_config_thirdstage
+	req=(core_packages base_packages)
+	ckreq || return 1
+
+	cat << EOF
+#!/bin/sh
+apt-get update
+debconf-set-selections /debconf.set
+
+echo "${rootcredentials}" | chpasswd
+sed -i -e 's/KERNEL\!=\"eth\*|/KERNEL\!=\"/' \
+	/lib/udev/rules.d/75-persistent-net-generator.rules
+rm -f /etc/udev/rules.d/70-persistent-net.rules
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get --yes --force-yes install ${core_packages}
+apt-get --yes --force-yes install ${base_packages}
+apt-get --yes --force-yes purge  ${purge_packages}
+apt-get --yes --force-yes autoremove
+apt-get clean
+
+rm -f /debconf.set
+rm -f /etc/ssh/ssh_host_*
+rm -f /root/.bash_history
+echo "1" > .keep
+EOF
+}
+
+bootstrap_tar_pack() {
+	fn bootstrap_tar_pack
+	req=(bootstrap_tgz)
+	ckreq || return 1
+
+	local _dest=$(dirname $bootstrap_tgz)
+
+	if [[ -f $bootstrap_tgz ]]; then
+		act "tarball found already in $_dest"
+	else
+		notice "Creating boostrap tarball in $bootstrap_tgz"
+		silly
+
+		pushd ${strapdir}
+		mkdir -p ${_dest}
+		silly
+		sudo tar czfp $bootstrap_tgz \
+			--exclude={./boot,./dev,./sys,./proc} \
+			./
+		popd
+	fi
+}
+
+bootstrap_tar_unpack() {
+	fn bootstrap_tar_unpack $@
+	local unpath="$1"
+	req=(unpath bootstrap_tgz)
+	ckreq || return 1
+
+	if [[ -f "${unpath}/.keep" ]]; then
+		mkdir -p ${unpath}
+		silly
+		sudo tar xfp $bootstrap_tgz -C ${unpath}
+		sudo mkdir -p ${unpath}/{boot,dev,sys,proc}
+	else
+		error "no .keep file found. exiting..."
+		zerr
+		exit 1
+	fi
+
+	cat <<EOF | sudo tee ${strapdir}/postunpack >/dev/null
+#!/bin/sh
+apt-get update
+apt-get --yes --force-yes upgrade
+apt-get --yes --force-yes install ${extra_packages}
+apt-get --yes --force-yes autoremove
+apt-get clean
+EOF
+
+	chroot-script -d postunpack || zerr
+
+	## below typically used in arm-sdk
+	[[ -n "$inittab" ]] && {
+		print $inittab | sudo tee -a $strapdir/etc/inittab >/dev/null
+	}
+
+	for i in $custmodules; do
+		print $i | sudo tee -a $strapdir/etc/modules >/dev/null
+	done || return 0
+}

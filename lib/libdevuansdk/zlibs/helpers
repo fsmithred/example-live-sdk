@@ -1,0 +1,326 @@
+#!/usr/bin/env zsh
+# Copyright (c) 2016-2017 Dyne.org Foundation
+# libdevuansdk is maintained by Ivan J. <parazyd@dyne.org>
+#
+# This file is part of libdevuansdk
+#
+# This source code is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this source code. If not, see <http://www.gnu.org/licenses/>.
+
+## helper functions that make my life easier
+
+build_image_dist() {
+	fn build_image_dist
+	req=(arch size parted_type)
+	if [[ $parted_type = gpt ]]; then
+		req+=(gpt_boot gpt_root)
+	elif [[ $parted_type = dos ]]; then
+		req+=(parted_root parted_boot)
+	fi
+	req+=(workdir strapdir image_name)
+	ckreq || return 1
+
+	notice "building complete dist image"
+	act "$image_name"
+
+	bootstrap_complete_base            || zerr
+	blend_preinst                      || zerr
+	image_prepare_raw                  || zerr
+	image_partition_raw_${parted_type} || zerr
+	build_kernel_${arch}               || zerr
+	blend_postinst                     || zerr
+	rsync_to_raw_image                 || zerr
+	image_pack_dist                    || zerr
+}
+
+build_iso_dist() {
+	fn build_iso_dist
+	req=(workdir strapdir os arch)
+	ckreq || return 1
+
+	notice "building complete iso image"
+
+	bootstrap_complete_base || zerr
+	blend_preinst           || zerr
+	iso_prepare_strap       || zerr
+	build_kernel_${arch}    || zerr
+	iso_setup_isolinux      || zerr
+	iso_write_isolinux_cfg  || zerr
+	#[[ $INSTALLER = 1 ]] && iso_setup_installer || zerr
+	blend_postinst          || zerr
+	iso_squash_strap        || zerr
+	iso_xorriso_build       || zerr
+}
+
+build_vagrant_dist() {
+	fn build_vagrant_dist
+	req=(workdir strapdir os arch imageformat)
+	ckreq || return 1
+
+	notice "building complete vagrant image"
+
+	image_${imageformat}_as_strapdir   || zerr
+	bootstrap_complete_base            || zerr
+	vm_inject_overrides                || zerr
+	blend_preinst                      || zerr
+	vm_setup_grub                      || zerr
+	blend_postinst                     || zerr
+	vm_umount_${imageformat}           || zerr
+	vm_vbox_setup                      || zerr
+	vm_vagrant_package                 || zerr
+	vm_pack_dist                       || zerr
+}
+
+getfield() {
+	fn getfield $*
+	print "$1" | \
+		grep "^$2=" | \
+		sed -e 's:.*=\(.*\)$:\1:g' | \
+		sed -e 's:^"\(.*\)"$:\1:g'
+}
+
+add-user() {
+	fn add-user $*
+	local user="$1"
+	local pass="$2"
+	req=(strapdir user pass)
+	ckreq || return 1
+
+	notice "adding user $user:$pass"
+
+	cat <<EOF | sudo tee ${strapdir}/adduser
+#!/bin/sh
+useradd -m ${user}
+echo "${user}:${pass}" | chpasswd
+EOF
+	chroot-script adduser || zerr
+}
+
+devprocsys() {
+	fn devprocsys "$@"
+	local watdo="$1"
+	local werdo="$2"
+	req=(watdo werdo)
+	ckreq || return 1
+
+	if [[ $watdo = mount ]]; then
+		sudo mount -o bind /sys     $werdo/sys     && act "mounted sys"    && \
+		sudo mount -t proc proc     $werdo/proc    && act "mounted proc"   && \
+		sudo mount -o bind /dev     $werdo/dev     && act "mounted dev"    && \
+		sudo mount -o bind /dev/pts $werdo/dev/pts && act "mounted devpts" && \
+		return 0
+	elif [[ $watdo = umount ]]; then
+		sudo umount $werdo/dev/pts  && act "umounted devpts" && sleep 1 && \
+		sudo umount $werdo/dev      && act "umounted dev"    && sleep 1 && \
+		sudo umount $werdo/proc     && act "umounted proc"   && sleep 1 && \
+		sudo umount $werdo/sys      && act "umounted sys"    && sleep 1 && \
+		return 0
+	fi
+	return 1
+}
+
+findloopmapp() {
+	fn findloopmapp
+	req=(workdir image_name)
+	ckreq || return 1
+
+	notice "finding a free loopdevice"
+
+	loopdevice=$(sudo losetup -f --show $workdir/${image_name}.img)
+	mappdevice=$(sudo kpartx -va $loopdevice | \
+		sed -E 's/.*(loop[0-9])p.*/\1/g' | sed 1q)
+
+	func "loopdevice: $loopdevice"
+	func "mappdevice: $mappdevice"
+
+	silly sleep 2
+}
+
+findfreenbd() {
+	fn findfreenbd
+
+	notice "looking for a free /dev/nbd"
+
+	for i in $(seq 0 8); do
+		grep "^/dev/nbd${i}" /proc/mounts >/dev/null || {
+			print "/dev/nbd${i}"
+			break
+		}
+	done
+}
+
+qemu_install_user() {
+	fn qemu_install_user
+	req=(qemu_bin strapdir)
+	ckreq || return 1
+
+	notice "installing qemu-user-static"
+	sudo cp $qemu_bin $strapdir/usr/bin
+}
+
+dpkgdivert() {
+	fn dpkgdivert "$@"
+	req=(watdo werdo)
+	local watdo="$1"
+	local werdo="$2"
+	ckreq || return 1
+
+	if [[ $watdo = on ]]; then
+		cat <<EOF | sudo tee ${werdo}/dpkgdivert >/dev/null
+#!/bin/sh
+dpkg-divert --add --local \
+	--divert /usr/sbin/invoke-rc.d.chroot \
+	--rename /usr/sbin/invoke-rc.d
+cp /bin/true /usr/sbin/invoke-rc.d
+echo -e "#!/bin/sh\nexit 101" > /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
+EOF
+	elif [[ $watdo = off ]]; then
+		cat <<EOF | sudo tee ${werdo}/dpkgdivert >/dev/null
+#!/bin/sh
+rm -f /usr/sbin/policy-rc.d
+rm -f /usr/sbin/invoke-rc.d
+dpkg-divert --remove --rename /usr/sbin/invoke-rc.d
+EOF
+	fi
+
+	chroot-script dpkgdivert || zerr
+}
+
+enableserv() {
+	fn enableserv "$@"
+	local service="$1"
+	req=(service strapdir)
+	ckreq || return 1
+
+	cat <<EOF | sudo tee -a ${strapdir}/enserv >/dev/null
+#!/bin/sh
+update-rc.d ${service} enable
+EOF
+
+	notice "enabling $service service"
+	chroot-script enserv
+}
+
+disableserv() {
+	fn disableserv "$@"
+	local service="$1"
+	req=(service strapdir)
+	ckreq || return 1
+
+	cat <<EOF | sudo tee -a ${strapdir}/disserv >/dev/null
+#!/bin/sh
+update-rc.d ${service} disable
+EOF
+
+	notice "disabling $service service"
+	chroot-script disserv
+}
+
+install-custdebs() {
+	fn install-custdebs
+	req=(R strapdir)
+	ckreq || return 1
+
+	sudo mkdir -p $strapdir/debs
+	sudo cp $R/extra/custom-packages/*.deb $strapdir/debs/
+
+	cat <<EOF | sudo tee ${strapdir}/install-debs >/dev/null
+#!/bin/sh
+for deb in /debs/*.deb; do
+	dpkg -i \$deb
+	apt-get --yes --force-yes -f install
+done
+apt-get autoremove
+apt-get clean
+rm -rf /debs
+EOF
+	chroot-script install-debs
+}
+
+chroot-script() {
+	fn chroot-script "$@"
+
+	case "x$1" in
+		x-d)
+			local script="$2"
+			devprocsys mount "$strapdir" || zerr
+			dpkgdivert on "$strapdir"    || zerr
+			notice "chrooting to execute $script..."
+			sudo chmod +x  "$strapdir/$script"    || zerr
+			sudo -E chroot "$strapdir" "/$script" || zerr
+			dpkgdivert off "$strapdir"    || zerr
+			devprocsys umount "$strapdir" || zerr
+			;;
+		*)
+			local script="$1"
+			notice "chrooting to execute $script..."
+			sudo chmod +x  "$strapdir/$script" || zerr
+			sudo -E chroot "$strapdir" "/$script" || zerr
+			;;
+	esac
+
+	sudo rm -f $strapdir/$script
+}
+
+blend_preinst() {
+	fn blend_preinst
+	func "not overriden"
+	return 0
+}
+
+blend_postinst() {
+	fn blend_postinst
+	func "not overriden"
+	return 0
+}
+
+silly() {
+	fn silly "$@"
+	local arg1="$1"
+	local arg2="$2"
+	## cheers mailpile!
+	funneh=("do not think of purple hippos"
+		"increasing entropy & scrambling bits"
+		"indexing kittens..."
+		"patching bugs..."
+		"spinning violently around the y-axis"
+		"warming up particle accelerator"
+		"this server is powered by a lemon and two electrodes"
+		"becoming self-aware"
+		"BCC-ing ALL THE SPIES!"
+		"all of your config settings & passwords are encrypted with AES256"
+		"the most common password is 123456, hopefully yours is different"
+		"good things come to those who wait"
+		"Make Free Software and be happy"
+		"We like volcanos, do you like volcanos?"
+		"Crossing out swear words..."
+		"Informing David Cameron of suspicious ac^H^H^H ... naaah :)"
+		"Abandon all hope, ye who enter here"
+		"Compiling bullshit bingo grid..."
+		"Estimating chance of asteroid hitting Earth"
+		"Applying coupons..."
+		"Backing up the entire Internet..."
+		"Making you wait for no reason"
+		"Doing nothing"
+		"Pay no attention to the man behind the curtain"
+		"You are great just the way you are"
+		"Supplying monkeys with typewriters"
+		"Swapping time and space"
+		"Self potato"
+		"god is porco"
+		"A million hamsters are spinning their wheels right now"
+	)
+	local rnd=$(shuf -i1-$#funneh -n 1)
+	act "${funneh[$rnd]}" ; [[ $arg1 = sleep ]] && sleep $arg2
+}

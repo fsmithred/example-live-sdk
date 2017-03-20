@@ -1,0 +1,38 @@
+#!/usr/bin/env zsh
+# Copyright (c) 2016-2017 Dyne.org Foundation
+# libdevuansdk maintained by Ivan J. <parazyd@dyne.org>
+#
+# This file is part of libdevuansdk
+#
+# This source code is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this source code. If not, see <http://www.gnu.org/licenses/>.
+
+libdevuansdk_version="0.4"
+LIBPATH=${LIBPATH:-$(dirname $0)}
+
+source $LIBPATH/config
+source $LIBPATH/zlibs/bootstrap
+source $LIBPATH/zlibs/helpers
+source $LIBPATH/zlibs/imaging
+source $LIBPATH/zlibs/iso
+source $LIBPATH/zlibs/kernel
+source $LIBPATH/zlibs/rsync
+source $LIBPATH/zlibs/sysconf
+source $LIBPATH/zlibs/vm
+
+vars+=(libdevuansdk_version)
+vars+=(LIBPATH)
+
+setopt pushdsilent
+
+act "libdevuansdk v$libdevuansdk_version loaded"
