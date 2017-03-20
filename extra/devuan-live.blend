@@ -1,0 +1,174 @@
+#!/usr/bin/env zsh
+# devuan-live.blend
+
+source "$R/config"
+
+blend_preinst() {
+	fn blend_preinst
+	req=(strapdir blend)
+	ckreq || return 1
+
+	notice "executing $blend_name preinst"
+
+	add-user "$loginname" "$password"
+	
+}
+
+
+blend_postinst() {
+	fn blend_postinst
+	req=(strapdir)
+	ckreq || return 1
+
+	notice "executing $blend_name postinst"
+
+# Install deb packages (and deps) found in $R/extra/custom-packages/
+	install-custdebs
+	sudo apt-get --yes --force-yes -f install
+
+# remove grub configs for iso  ### Don't seem to need this. Only unicode.pf2 is in /boot/grub/
+#	notice "removing grub configs"
+#	pushd "$strapdir"/boot/grub   || zerr
+#	rm -f grub.cfg
+#	rm -f device.map
+#	popd
+
+# copy rootfs_overlay	
+	notice "grabbing rootfs-overlay"
+	pushd "$strapdir"
+	sudo rsync -avx "$rootfs_overlay" . || zerr
+	popd
+
+	blend_finalize || zerr
+}
+
+
+iso_setup_isolinux() {
+	fn iso_setup_isolinux
+	req=(workdir strapdir)
+	ckreq || return 1
+
+	notice "setting up isolinux"
+
+	pushd $workdir
+	sudo mkdir -p binary/{live,isolinux}
+	act "copying kernel and initrd"
+
+	sudo cp $isolinux_overlay/* binary/isolinux	
+	sudo cp $strapdir/boot/vmlinuz* binary/live/vmlinuz
+	sudo cp $strapdir/boot/initrd*  binary/live/initrd
+
+# alternate location if live-build is not installed:
+# /usr/lib/ISOLINUX/isolinux.bin (or other, for older versions of syslinux)
+	sudo cp /usr/share/live/build/bootloaders/isolinux/isolinux.bin \
+		binary/isolinux
+	sudo cp /usr/share/live/build/bootloaders/isolinux/*.c32 \
+		binary/isolinux
+	popd
+}
+
+iso_write_isolinux_cfg() {
+	fn iso_write_isolinux_cfg "(override)"
+	req=(workdir arch)
+	ckreq || return 1
+
+	notice "writing isolinux configuration"
+	
+#######   If you use backspace or arrow to edit boot command, the line repeats. How to fix that?
+	cat <<EOF | sudo tee ${workdir}/binary/isolinux/isolinux.cfg >/dev/null
+ui vesamenu.c32
+prompt 0
+menu title devuan-live boot menu
+timeout 70
+menu background /isolinux/splash.png
+menu background /isolinux/splash.png
+menu color title	* #FFFFFFFF *
+menu color border	* #00000000 #00000000 none
+menu color sel		* #ffffffff #A1B067 *
+menu color hotsel	1;7;37;40 #ffffffff #A1B067 *
+menu color tabmsg	* #E5FD91 #00000000 *
+menu color cmdline 0 #E5FD91 #00000000
+menu vshift 12
+menu rows 12
+
+label live-${arch}
+menu label ^devuan-live (${arch})
+menu default
+linux /live/vmlinuz
+append initrd=/live/initrd boot=live username=$loginname 
+
+label toram
+menu label ^devuan-live (load to RAM)
+linux /live/vmlinuz
+append initrd=/live/initrd boot=live username=$loginname toram 
+
+label failsafe
+	menu label ^devuan-live (failsafe)
+    kernel /live/vmlinuz noapic noapm nodma nomce nolapic nosmp vga=normal 
+    append initrd=/live/initrd  boot=live 
+
+endtext
+EOF
+}
+
+
+iso_squash_strap() {
+	fn iso_squash_strap
+	req=(workdir strapdir)
+	ckreq || return 1
+
+	notice "creating squashfs out of strapdir"
+
+	pushd $workdir
+	sudo mksquashfs $strapdir binary/live/filesystem.squashfs -noappend -comp xz  || zerr
+	popd
+}
+
+
+blend_finalize() {
+	fn blend_finalize
+	req=(strapdir)
+	ckreq || return 1
+
+	cat <<EOF | sudo tee ${strapdir}/finalize >/dev/null
+#!/bin/sh
+# finalize
+set -x
+exec 2>finalize.log
+
+
+## perms
+
+	for i in cdrom floppy audio dip video plugdev netdev lpadmin scanner; do
+		gpasswd -a "$loginname" \${i}
+	done
+	
+	chsh -s "$user_default_shell" "$loginname"
+	chown -R 1000:1000 /home/"$loginname"
+	
+# What's this? Do I need it?
+rm -rf /usr/local/share/zsh/site-functions
+
+
+# grub theme 
+if ! grep -q GRUB_THEME /etc/default/grub ; then
+	echo "\nGRUB_THEME=/usr/share/desktop-base/grub-themes/desktop-grub-theme/theme.txt\n" >> /etc/default/grub
+fi
+
+# remove fstab for iso. This should probably be in iso_prepare_strap
+rm -f /etc/fstab
+
+
+## cleanup
+
+#apt-get --yes --force-yes purge ${finalize_purge_packages}
+#apt-get --yes --force-yes autoremove
+apt-get clean
+updatedb
+EOF
+	chroot-script finalize || zerr
+	
+	sudo chmod 666 "$strapdir"/*.log
+	sudo mv "$strapdir"/*.log "$R/extra/logs"
+	
+}

@@ -86,6 +86,9 @@ bootstrap_config_thirdstage() {
 
 	cat << EOF
 #!/bin/sh
+set -x
+exec 2>stage3.log
+
 apt-get update
 debconf-set-selections /debconf.set
 
@@ -150,6 +153,9 @@ bootstrap_tar_unpack() {
 
 	cat <<EOF | sudo tee ${strapdir}/postunpack >/dev/null
 #!/bin/sh
+set -x 
+exec 2>postunpack.log
+
 apt-get update
 apt-get --yes --force-yes upgrade
 apt-get --yes --force-yes install ${extra_packages}

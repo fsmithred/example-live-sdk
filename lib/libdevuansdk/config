@@ -27,7 +27,7 @@ arrs+=(core_packages base_packages purge_packages blend_packages)
 
 os="devuan"
 release="jessie"
-version="1.0.0-beta2"
+version="1.0.0-beta2+"
 mirror="http://auto.mirror.devuan.org/merged"
 section="main"
 
@@ -42,41 +42,52 @@ rootcredentials="root:toor"
 usercredentials="devuan:devuan"
 
 core_packages=(
-	devuan-keyring
-	debian-keyring
 	ca-certificates
 	initramfs-tools
-	e2fsprogs
 	bzip2
 	curl
-	less
 	vim
-	nano
-	sysvinit
+	lsof
+	bash-completion
+	texinfo
+
 )
 
 base_packages=(
-	apt-utils
-	parted
-	openssh-server
+	acpi-support-base
+	aptitude
+	apt-listchanges
+	discover
+	dnsutils
+	doc-debian
+	docutils-common
+	docutils-doc
+	ftp
+	gettext
+	gnupg2
+	grub-pc
+	laptop-detect
+	mlocate
+	mutt
+	ncurses-term
+	nfs-common
 	openssh-client
-	sudo
-	alsa-base
-	alsa-utils
-	mawk
-	tmux
-	screen
-	openntpd
-	wpasupplicant
-	wireless-tools
-	elinks
-	firmware-linux-free
-	btrfs-tools
-	zsh
-	rsync
-	git-core
+	procmail
+	rsyslog
+	telnet
+	usbutils
+	whois
+	task-desktop
+	task-english
+	locales
+#	locales-all
+	task-xfce-desktop
+	task-print-server
+	tasksel
+	tasksel-data
+	w3m
 )
 
 purge_packages+=(
-	dbus
+
 )

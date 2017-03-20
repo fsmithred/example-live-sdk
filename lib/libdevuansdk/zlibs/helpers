@@ -178,6 +178,9 @@ dpkgdivert() {
 	if [[ $watdo = on ]]; then
 		cat <<EOF | sudo tee ${werdo}/dpkgdivert >/dev/null
 #!/bin/sh
+set -x
+exec 2>dpkgdivert.log
+
 dpkg-divert --add --local \
 	--divert /usr/sbin/invoke-rc.d.chroot \
 	--rename /usr/sbin/invoke-rc.d
@@ -237,6 +240,9 @@ install-custdebs() {
 
 	cat <<EOF | sudo tee ${strapdir}/install-debs >/dev/null
 #!/bin/sh
+set -x
+exec 2>custdebs.log
+
 for deb in /debs/*.deb; do
 	dpkg -i \$deb
 	apt-get --yes --force-yes -f install
