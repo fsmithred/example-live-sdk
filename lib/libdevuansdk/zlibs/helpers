@@ -243,10 +243,12 @@ install-custdebs() {
 set -x
 exec 2>custdebs.log
 
-for deb in /debs/*.deb; do
+cd /debs
+for deb in ${custom_deb_packages}; do
 	dpkg -i \$deb
 	apt-get --yes --force-yes -f install
 done
+cd -
 apt-get autoremove
 apt-get clean
 rm -rf /debs
