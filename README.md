@@ -9,7 +9,7 @@ Where to start?
 - clone or download example-live-sdk (hereafter called 'live-sdk' in this document)
 - cd live-sdk   # This is your working directory.
 
-There are two files in the live-sdk directory that you need to edit - the config file and the blend file. 
+There are two files in the live-sdk directory that you need to edit or create - the config file and the blend file. 
 
 You should not need to change any of the other files, but that is certainly an option, and it may be needed in some cases.
 
@@ -24,7 +24,7 @@ You should not need to change any of the other files, but that is certainly an o
 	Note: $R is the working directory, live-sdk. The blend_location can be a local path as shown, or it can be a url for a blend file online.
 
 
-- edit the blend file. Name it <blend-name>.blend and save it in live-sdk/extra.
+- edit the blend file. Name it <blend-name>.blend and save it in live-sdk/extra/.
 	Absolute minimum contents of the blend file:
 	
 			#!/usr/bin/env zsh
