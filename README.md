@@ -6,7 +6,7 @@ The following is not an explanation of all the parts of live-sdk. This is a quic
 
 Where to start?
 
-- clone or download example-live-sdk
+- clone or download example-live-sdk (hereafter called 'live-sdk' in this document)
 - cd live-sdk   # This is your working directory.
 
 There are two files in the live-sdk directory that you need to edit - the config file and the blend file. 
