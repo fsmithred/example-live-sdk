@@ -1,4 +1,4 @@
-This example-live-sdk was cloned from live-sdk by parazyd (Ivan J.) and jaromil (Denis Roio) and then modified by fsmithred. Variables were created so that all configuration can take place in two files. 
+This example-live-sdk was cloned from live-sdk by parazyd (Ivan J.), jaromil (Denis Roio) and katolaz (Enzo Nicosia). It was then modified by fsmithred. Variables were created so that all configuration can take place in two files. 
 
 The following is not an explanation of all the parts of live-sdk. This is a quick start guide to get you making your own custom isos for live-CD/DVD/USB with a minimum of configuration. For a more in-depth explanation of live-sdk, see Inside Heads by parazyd.  And for a more complex configuration, see the heads sdk. ***(Need links)*** 
 
