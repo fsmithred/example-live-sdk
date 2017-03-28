@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# quit-dialogue.6
+# For openbox, xscreensaver. Need sudo allowed for halt and reboot, pm-hibernate and pm-suspend.
+
+
+yad --title="Exit Choices" \
+        --width=350 --height=60  --columns=2 \
+	--button="Lock Screen"!/usr/share/icons/nuoveXT2/22x22/actions/lock.png:0  \
+	--button=Logout!/usr/share/icons/nuoveXT2/22x22/actions/application-exit.png:1 \
+	--button=Reboot!/usr/share/icons/nuoveXT2/22x22/actions/gtk-refresh.png:2 \
+	--button=Shutdown!/usr/share/icons/nuoveXT2/22x22/actions/system-shutdown.png:3 \
+	--button=Hibernate!/usr/share/icons/nuoveXT2/22x22/apps/gnome-session-hibernate.png:4 -\
+	--button=Suspend!/usr/share/icons/nuoveXT2/22x22/apps/gnome-session-suspend.png:5 \
+	--button=Cancel!/usr/share/icons/nuoveXT2/22x22/actions/gtk-close.png:6 
+#       --button="gtk-close:4"
+
+	
+answer="$?"
+
+	case $answer in
+		0) xscreensaver-command -lock ;;
+#		1) openbox --exit ;;
+		1) pkill -u $USER ;;
+		2) sudo /sbin/reboot ;;
+		3) sudo /sbin/halt ;;
+		4) sudo /usr/sbin/pm-hibernate ;;
+		5) sudo /usr/sbin/pm-suspend ;;
+		6) exit 0 ;;
+	esac
+
+exit 0

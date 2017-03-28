@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# dimscreen
+
+set -x
+
+# This works if one monitor is connected.
+monitor1=$(xrandr | awk '$2 == "connected" { print $1 }')
+
+#monitor1=
+#monitor2=
+
+
+#br1="$1"
+#br2="$2"
+
+
+
+
+#if [ -z "$br1" ] | [ -z "$br2" ] ; then
+#    echo  "Example:
+#    dimscreen 4 3
+#"
+#    exit 0
+#fi
+
+#!/usr/bin/env bash
+
+set -x
+
+# This section is disabled. It needs work.
+set_gamma () {
+	current_gamma=$(xrandr --verbose |grep -m1 Gamma | cut -d":" -f3)
+	if [ "$current_gamma" = 1.0 ] ; then
+		gamma_val="10"
+	else
+		gamma_val="${current_gamma:2:1}"
+	fi
+	echo "gamma_val is $gamma_val"
+#	gm1=$(yad --scale --title=Gamma  --value="$gamma_val" --min-value=7 --max-value=10 --mark=7:7 --mark=8:8 --mark=9:9 --mark=10:10)
+	gm1=$(yad --form --field=Gamma:NUM "${current_gamma}\!0.5..1.5\!0.1\!1")
+	echo "gm1 is $gm1"
+#	if [ "$gm1" = 10 ] ; then
+#		gamma1= 1.0
+#	else
+#		gamma1="0.$gm1"
+#	fi
+	gamma1="${gm1:0:3}"
+	echo "gamma1 is $gamma1"
+	xrandr --output $monitor1 --gamma "${gamma1}:${gamma1}:${gamma1}"
+	exit 0
+}
+
+
+current_bright=$(xrandr --verbose | grep -m1 Brightness | cut -d"." -f2)
+	if  [ "$current_bright" = 0 ] ; then
+		let current_bright="9"
+	fi
+
+br1=$(yad --scale --title=Brightness --width=300 --min-value=2 --max-value=10  --value="${current_bright:0:1}" \
+	--mark=2:2  --mark=3:3 --mark=4:4 --mark=5:5 --mark=6:6 --mark=7:7 --mark=8:8 --mark=9:9 --mark=10:10 \
+	--page=1 --button=OK:0 --button="Gamma":1 --button=Exit:2)
+	exit_code="$?"
+	if [[ $exit_code -eq 1 ]] ; then
+		set_gamma
+		exit 0
+	elif [[ $exit_code -eq 2 ]] ; then
+		exit 0
+	fi
+
+#echo "$answer" > /sys/class/backlight/acpi_video0/brightness
+
+#exit 0
+
+
+
+
+if [ "$br1" = 10 ] ; then
+	bright1="1.0"
+	bright2="1.0"
+else
+	bright1="0.$br1"
+	br2="$br1"
+	(( br2-=1 ))
+#fi
+
+#if [ "$br2" = 1 ] ; then
+#	bright2="1.0"
+#else
+	bright2="0.$br2"
+fi
+
+set_bright () {
+xrandr --output $monitor1 --brightness "$bright1"
+xrandr --output $monitor2 --brightness "$bright2"
+#xrandr --output default --brightness 0."$br"
+
+exit 0
+}
+
+set_bright
+

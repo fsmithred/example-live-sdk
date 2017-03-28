@@ -1,0 +1,4 @@
+/usr/bin/lxterminal &
+/usr/bin/lxpanel &
+spacefm --desktop &
+xscreensaver -nosplash &

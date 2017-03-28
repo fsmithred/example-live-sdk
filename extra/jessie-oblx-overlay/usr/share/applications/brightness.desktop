@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Brightness
+Comment=Set screen brightness
+Exec=/usr/local/bin/set-bright
+Icon=/usr/share/pixmaps/brightness.png
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Settings;HardwareSettings;
+StartupNotify=true

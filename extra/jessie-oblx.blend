@@ -1,0 +1,333 @@
+#!/usr/bin/env zsh
+# jessie-oblx.blend
+
+#source "$R/config.jessie-oblx"
+source "$configfile"
+
+blend_preinst() {
+	fn blend_preinst
+	req=(strapdir blend)
+	ckreq || return 1
+
+	notice "executing $blend_name preinst"
+
+	add-user "$loginname" "$password"
+	
+}
+
+
+blend_postinst() {
+	fn blend_postinst
+	req=(strapdir)
+	ckreq || return 1
+
+	notice "executing $blend_name postinst"
+	
+	iso_make_efi
+
+# Install deb packages (and deps) found in $R/extra/custom-packages/
+	install-custdebs
+	sudo apt-get --yes --force-yes -f install
+
+# copy rootfs_overlay	
+	notice "grabbing rootfs-overlay"
+	pushd "$strapdir"
+	sudo rsync -avx "$rootfs_overlay" . || zerr
+	popd
+
+	blend_finalize || zerr
+}
+
+
+iso_setup_isolinux() {
+	fn iso_setup_isolinux
+	req=(workdir strapdir)
+	ckreq || return 1
+
+	notice "setting up isolinux"
+
+	pushd $workdir
+	sudo mkdir -p binary/{live,isolinux}
+	act "copying kernel and initrd"
+
+	sudo cp $isolinux_overlay/* binary/isolinux	
+	sudo cp $strapdir/boot/vmlinuz* binary/live/vmlinuz
+	sudo cp $strapdir/boot/initrd*  binary/live/initrd
+
+# alternate location if live-build is not installed:
+# /usr/lib/ISOLINUX/isolinux.bin (or other, for older versions of syslinux)
+	sudo cp /usr/share/live/build/bootloaders/isolinux/isolinux.bin \
+		binary/isolinux
+	sudo cp /usr/share/live/build/bootloaders/isolinux/*.c32 \
+		binary/isolinux
+	popd
+}
+
+
+iso_write_isolinux_cfg() {
+	fn iso_write_isolinux_cfg "(override)"
+	req=(workdir arch)
+	ckreq || return 1
+
+	notice "writing isolinux configuration"
+	cat <<EOF | sudo tee ${workdir}/binary/isolinux/isolinux.cfg >/dev/null
+ui vesamenu.c32
+prompt 0
+menu title devuan-live boot menu
+timeout 70
+menu background /isolinux/splash.png
+menu background /isolinux/splash.png
+menu color title	* #FFFFFFFF *
+menu color border	* #00000000 #00000000 none
+menu color sel		* #ffffffff #A1B067 *
+menu color hotsel	1;7;37;40 #ffffffff #A1B067 *
+menu color tabmsg	* #E5FD91 #00000000 *
+menu color cmdline 0 #E5FD91 #00000000
+menu vshift 12
+menu rows 12
+
+label live-${arch}
+menu label ^jessie-oblx (${arch})
+menu default
+linux /live/vmlinuz
+append initrd=/live/initrd boot=live username=$loginname 
+
+label toram
+menu label ^jessie-oblx (load to RAM)
+linux /live/vmlinuz
+append initrd=/live/initrd boot=live username=$loginname toram 
+
+label failsafe
+	menu label ^jessie-oblx (failsafe)
+    kernel /live/vmlinuz noapic noapm nodma nomce nolapic nosmp vga=normal 
+    append initrd=/live/initrd  boot=live 
+
+endtext
+EOF
+}
+
+
+iso_squash_strap() {
+	fn iso_squash_strap
+	req=(workdir strapdir)
+	ckreq || return 1
+
+	notice "creating squashfs out of strapdir"
+
+	pushd $workdir
+	sudo mksquashfs $strapdir binary/live/filesystem.squashfs -noappend -comp xz -Xbcj x86 || zerr
+	popd
+}
+
+
+iso_xorriso_build() {
+	fn iso_xorriso_build
+	req=(workdir image_name)
+	ckreq || return 1
+
+	notice "building iso..."
+	isoname="${image_name}-live.iso"
+
+	mkdir -p $R/dist
+	pushd $workdir
+	sudo xorriso -as mkisofs -r -J -joliet-long -l \
+		-isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
+		-partition_offset 16 \
+		-A "${os} Live - ${arch}" \
+		-b isolinux/isolinux.bin \
+		-c isolinux/boot.cat \
+		-no-emul-boot \
+		-boot-load-size 4 \
+		-boot-info-table \
+		-eltorito-alt-boot -e boot/grub/efiboot.img -isohybrid-gpt-basdat -no-emul-boot \
+		-o $R/dist/$isoname \
+		binary || zerr
+	popd
+}
+
+
+# create /boot and /efi for uefi.
+# uefi code borrowed and adapted from David Hare, who borrowed and adapted it 
+# from similar scripts by Colin Watson and Patrick J. Volkerding.
+iso_make_efi() {
+	fn iso_make_efi
+	req=(workdir efi_work)
+	ckreq || return 1
+	set -x
+	notice "creating efi boot files"
+	
+#	uefi_opt="-eltorito-alt-boot -e boot/grub/efiboot.img -isohybrid-gpt-basdat -no-emul-boot"
+	
+	tempdir="$(mktemp -d /tmp/work_temp.XXXX)"
+
+	# for initial grub.cfg
+	mkdir -p "$tempdir"/boot/grub
+
+
+	cat >"$tempdir"/boot/grub/grub.cfg <<EOF
+search --file --set=root /isolinux/isolinux.cfg
+set prefix=(\$root)/boot/grub
+source \$prefix/x86_64-efi/grub.cfg
+EOF
+
+
+	if ! [ -d "$efi_work" ] ; then
+		mkdir "$efi_work"
+		
+	fi
+
+	pushd "$efi_work"
+
+	# start with empty directories.
+
+	if [ -d "boot" ] ; then
+		rm -rf boot
+	fi
+	
+	if [ -d "efi" ] ; then
+		rm -rf efi
+	fi
+
+	mkdir -p boot/grub/x86_64-efi
+	mkdir -p efi/boot
+
+	# copy splash
+	cp ${isolinux_overlay}splash.png boot/grub/splash.png
+	
+	# second grub.cfg file
+	for i in $(ls /usr/lib/grub/x86_64-efi|grep part_|grep \.mod|sed 's/.mod//'); do echo "insmod $i" >> boot/grub/x86_64-efi/grub.cfg; done
+	# Additional modules so we don't boot in blind mode. I don't know which ones are really needed.
+	for i in efi_gop efi_uga ieee1275_fb vbe vga video_bochs video_cirrus jpeg png gfxterm ; do echo "insmod $i" >> boot/grub/x86_64-efi/grub.cfg ; done
+
+	echo "source /boot/grub/grub.cfg" >> boot/grub/x86_64-efi/grub.cfg
+	
+	pushd "$tempdir"
+	
+		# make a tarred "memdisk" to embed in the grub image
+		tar -cvf memdisk boot
+		
+		# make the grub image
+		grub-mkimage -O "x86_64-efi" -m "memdisk" -o "bootx64.efi" -p '(memdisk)/boot/grub' search iso9660 configfile normal memdisk tar cat part_msdos part_gpt fat ext2 ntfs ntfscomp hfsplus chain boot linux
+		
+	popd
+	
+	# copy the grub image to efi/boot (to go later in the device's root)
+	cp "$tempdir"/bootx64.efi efi/boot
+	
+	#######################
+	
+	## Do the boot image "boot/grub/efiboot.img"
+	
+	dd if=/dev/zero of=boot/grub/efiboot.img bs=1K count=1440
+	/sbin/mkdosfs -F 12 boot/grub/efiboot.img
+	
+	sudo mkdir img-mnt
+	
+	sudo mount -o loop boot/grub/efiboot.img img-mnt
+	
+	sudo mkdir -p img-mnt/efi/boot
+	
+	sudo cp "$tempdir"/bootx64.efi img-mnt/efi/boot/
+	
+	#######################
+	
+	# copy modules and font
+	cp /usr/lib/grub/x86_64-efi/* boot/grub/x86_64-efi/
+	
+	# if this doesn't work try another font from the same place (grub's default, unicode.pf2, is much larger)
+	# Either of these will work, and they look the same to me. Unicode seems to work with qemu. -fsr
+#	cp /usr/share/grub/ascii.pf2 boot/grub/font.pf2
+	cp /usr/share/grub/unicode.pf2 boot/grub/font.pf2
+	
+	# doesn't need to be root-owned
+#	sudo chown -R 1000:1000 $(pwd) 2>/dev/null
+	
+	# Cleanup efi temps
+	sudo umount img-mnt
+	sudo rmdir img-mnt
+	rm -rf "$tempdir"
+
+	popd
+
+
+	# Copy efi files to iso
+	pushd $workdir
+	sudo rsync -avx "$efi_work"/boot binary/
+	sudo rsync -avx "$efi_work"/efi  binary/
+	popd
+	
+	# Do the main grub.cfg (which gets loaded last):
+	cat <<EOF | sudo tee ${workdir}/binary/boot/grub/grub.cfg
+if loadfont $prefix/font.pf2 ; then
+  set gfxmode=640x480
+  insmod efi_gop
+  insmod efi_uga
+  insmod video_bochs
+  insmod video_cirrus
+  insmod gfxterm
+  insmod jpeg
+  insmod png
+  terminal_output gfxterm
+fi
+
+background_image /boot/grub/splash.png
+set menu_color_normal=white/black
+set menu_color_highlight=dark-gray/white
+set timeout=6
+
+menuentry "${os} (defaults)" {
+    set gfxpayload=keep
+    linux   /live/vmlinuz boot=live username=$loginname    
+    initrd  /live/initrd
+}
+EOF
+set +x
+}
+
+
+blend_finalize() {
+	fn blend_finalize
+	req=(strapdir)
+	ckreq || return 1
+
+	cat <<EOF | sudo tee ${strapdir}/finalize >/dev/null
+#!/bin/sh
+# finalize
+set -x
+exec 2>finalize.log
+
+
+## perms
+
+	for i in cdrom floppy audio dip video plugdev netdev ; do   # lpadmin scanner  # put this in config file?
+		gpasswd -a "$loginname" \${i}
+	done
+	
+	chsh -s "$user_default_shell" "$loginname"
+	cp /etc/skel/.bashrc /home/"$loginname"
+	chown -R 1000:1000 /home/"$loginname"
+
+	
+	
+# What's this? Do I need it?
+rm -rf /usr/local/share/zsh/site-functions
+
+
+# remove fstab for iso. This should probably be in iso_prepare_strap
+rm -f /etc/fstab
+
+
+## cleanup
+
+#apt-get --yes --force-yes purge ${finalize_purge_packages}
+#apt-get --yes --force-yes autoremove
+apt-get clean
+/usr/bin/updatedb
+EOF
+	chroot-script finalize || zerr
+	
+	sudo chmod 666 "$strapdir"/*.log
+	sudo mv "$strapdir"/*.log "$R/extra/logs"
+	
+}
+

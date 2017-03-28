@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Clearlooks-Phénix-purky
+Name[fr]=Clearlooks-Phénix-purky
+Comment=GTK3 port of Clearlooks
+Comment[fr]=Version GTK3 de Clearlooks
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Clearlooks-Phenix-purky
+MetacityTheme=Clearlooks-Phenix-purky
+IconTheme=gnome
+CursorTheme=DMZ-White
+CursorSize=16
+ButtonLayout=:minimize,maximize,close

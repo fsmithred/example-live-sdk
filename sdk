@@ -38,7 +38,10 @@ arrs+=(extra_packages)
 ## global maps
 maps+=(os_map blend_map)
 
-source $R/config
+
+configfile="$1"
+[[ -e $configfile ]] || { error "no valid config specified"; exit 1 }
+source $R/$configfile
 #source $R/lib/helpers
 
 ## conclude zuper initialization
@@ -63,7 +66,8 @@ load() {
 	)
 
 	blend_map=(
-		"devuan-live"     "$R/extra/devuan-live.blend"
+#		"jessie-oblx"     "$R/extra/jessie-oblx.blend"
+		"$blend"         "$R/extra/${blend}.blend"
 	)
 
 	oslib="${os_map[$os]}"

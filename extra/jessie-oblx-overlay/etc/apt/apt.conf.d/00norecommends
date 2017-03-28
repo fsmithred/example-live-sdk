@@ -1,0 +1,3 @@
+APT::Install-Recommends "no";
+APT::Install-Suggests "no";
+

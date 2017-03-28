@@ -1,0 +1,94 @@
+#!/usr/bin/env zsh
+# config for minimal.blend
+
+
+# Separate these according to which funtion uses them.
+# Do it for the functions that need to be in the blend file.
+
+
+# Required
+
+blend_name="simple"
+
+
+
+# Path or URL to the blend file. (required)
+
+blend_location="$R/extra/${blend}.blend"
+
+
+
+# Default root password is "toor". If you want to change that,
+# uncomment and edit the following line.
+
+#rootcredentials="root:toor"
+
+
+
+# Give it a name and version, or it comes out
+# as devuan_jessie_1.0.0-beta2_amd64_minimal-live.iso
+# (maybe that should be changed to something more generic)
+
+blend_vers="0.0"
+image_name="${blend_name}-${blend_vers}-${arch}"
+
+
+
+# This will create a unique workdir for the blend. Useful if you are making several different blends.
+# If you leave it commented out, the default value is "devuan".
+#os="$blend_name"
+
+
+
+# Do not change this to ascii... yet.
+
+release="jessie"
+
+
+
+# These get used in add_user() which fits well in blend_preinst()
+# If login name is other than user, then add_user() must come before
+# iso_write_isolinux_cfg() and boot append text must contain username=$loginname
+# Comment out if you do not want a user created.
+
+loginname="user"
+password="user"
+
+
+
+# Use this if you don't want /bin/sh as the default shell.
+# This requires code in blend_finalize()
+
+user_default_shell="/bin/bash"
+
+
+
+# Path or URL to custom file trees
+
+rootfs_overlay="$R/extra/simple-overlay/"		# for custom system files
+isolinux_overlay="$R/extra/isolinux/"			# for isolinux boot splash or boot help files
+
+
+
+# You need to uncomment this if you want grub installed in your build.
+# Use either grub-efi-amd64 or grub-pc here. It will be installed with the base_packages. 
+grubversion="grub-pc"
+
+
+
+extra_packages+=(
+
+	xorg
+	xserver-xorg-video-all
+	xterm
+	pmount
+	spacefm
+	lightdm
+	icewm
+	leafpad
+
+)
+
+purge_packages+=(
+
+)
