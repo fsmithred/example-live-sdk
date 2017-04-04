@@ -9,37 +9,41 @@ Where to start?
 - clone or download example-live-sdk (hereafter called 'live-sdk' in this document)
 - cd live-sdk   # This is your working directory.
 
-There are two files in the live-sdk directory that you need to edit or create - the config file and the blend file. 
+It is possible to build without using a blend. This is described in the Quick start section of the original readme attached below. This will create a small cli-only live iso. To customize a build, create a blend.
 
-You should not need to change any of the other files, but that is certainly an option, and it may be needed in some cases.
-
-- edit live-sdk/config.
-	If you will be making several blends, name it config.<blend-name>
-	Absolute minumum contents would be:
-	
-			#!/usr/bin/env zsh
-			blend_name="absolute-minimum"
-			blend_location="$R/extra/${blend}.blend"   
-			
-	Note: $R is the working directory, live-sdk. The blend_location can be a local path as shown, or it can be a url for a blend file online.
+Blends each get their own directory in live-sdk/blends. Inside each individual blend file are all the instructions and components that are unique to that blend. This includes a config file, a blend file, overlay files, and custom packages. Take a look at the example blends in this repository.
 
 
-- edit the blend file. Name it <blend-name>.blend and save it in live-sdk/extra/.
-	Absolute minimum contents of the blend file:
-	
-			#!/usr/bin/env zsh
-			source "$configfile"
 
-
-Run the build with the following commands. Change arch to amd64 or i386. Change configfile to the name of your config file. (just the name, not the path) 
+Run the build with the following commands from the live-sdk directory. Change <arch> to amd64 or i386. 
 
 	zsh -f
 	source sdk <configfile>
 	load devuan <arch> <blend_name>
 	build_iso_dist
 
-That will give you a system built from debootstrap plus core_packages and base_packages
-with no user. The root password will be "toor". The iso file will be in live-sdk/dist.
+
+
+If you create your own blend, you also need to add a line to the blend map in live-sdk/sdk, around lines 65-70.
+
+	blend_map=(
+		"devuan-live"    "$R/blends/devuan-live/devuan-live.blend"
+		"heads"          "$R/../heads.blend"
+		"jessie-oblx"	"$R/blends/jessie-oblx/jessie-oblx.blend"
+		"simple-ice"	"$R/blends/simple-ice/simple-ice.blend"
+	)
+
+
+The rest of this section of the readme needs to be edited to reflect the changes in file location for the blend files. Adjust the information as needed.
+
+
+
+
+
+	Note: $R is the working directory, live-sdk. The blend_location can be a local path as shown, or it can be a url for a blend file online.
+
+
+
 
 core_packages is a list of packages that corresponds roughly to what you get if you un-check all boxes in the debian/devuan installer's tasksel window.
 
