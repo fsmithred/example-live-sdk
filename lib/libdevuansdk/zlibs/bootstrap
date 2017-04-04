@@ -41,8 +41,7 @@ bootstrap_complete_base() {
 
 	sudo -E debootstrap \
 		--foreign \
-		--arch $arch $release $strapdir $mirror || zerr		# for ascii:  --include=busybox,busybox-syslogd --exclude=rsyslog,alsa-base \
-
+		--arch $arch $release $strapdir $mirror || zerr
 
 	[[ $arch =~ "^arm.." ]] && { qemu_install_user || zerr }
 
@@ -87,9 +86,6 @@ bootstrap_config_thirdstage() {
 
 	cat << EOF
 #!/bin/sh
-set -x
-exec 2>stage3.log
-
 apt-get update
 debconf-set-selections /debconf.set
 
@@ -99,7 +95,6 @@ sed -i -e 's/KERNEL\!=\"eth\*|/KERNEL\!=\"/' \
 rm -f /etc/udev/rules.d/70-persistent-net.rules
 export DEBIAN_FRONTEND=noninteractive
 
-#apt --fix-broken install
 apt-get --yes --force-yes install ${core_packages}
 apt-get --yes --force-yes install ${base_packages}
 apt-get --yes --force-yes purge  ${purge_packages}
@@ -155,13 +150,9 @@ bootstrap_tar_unpack() {
 
 	cat <<EOF | sudo tee ${strapdir}/postunpack >/dev/null
 #!/bin/sh
-set -x 
-exec 2>postunpack.log
-
 apt-get update
 apt-get --yes --force-yes upgrade
 apt-get --yes --force-yes install ${extra_packages}
-#apt-get --yes -f install
 apt-get --yes --force-yes autoremove
 apt-get clean
 EOF

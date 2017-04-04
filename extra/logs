@@ -1,0 +1,16 @@
++ gpasswd -a devuan cdrom
++ gpasswd -a devuan floppy
++ gpasswd -a devuan audio
++ gpasswd -a devuan dip
++ gpasswd -a devuan video
++ gpasswd -a devuan plugdev
++ gpasswd -a devuan netdev
++ chsh -s  devuan
+chsh: Warning:  does not exist
++ cp /etc/skel/.bashrc /home/devuan
++ chown -R 1000:1000 /home/devuan
++ rm -rf /usr/local/share/zsh/site-functions
++ rm -f /etc/fstab
++ apt-get clean
++ /usr/bin/updatedb
+/finalize: 32: /finalize: /usr/bin/updatedb: not found

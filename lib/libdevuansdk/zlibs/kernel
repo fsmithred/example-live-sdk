@@ -26,8 +26,9 @@ build_kernel_${arch}() {
 
 	local kernel_base="linux-image"
 	case "$arch" in
-		amd64) local kernel="${kernel_base}-amd64";;
-		i386)  local kernel="${kernel_base}-586";;
+		amd64)	local kernel="${kernel_base}-amd64";;
+		i386)	[[ -n "$i386flavor" ]] || i386flavor="686-pae"
+				local kernel="${kernel_base}-${i386flavor}";;
 	esac
 
 	notice "installing stock kernel for $arch"

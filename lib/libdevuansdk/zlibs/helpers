@@ -178,9 +178,6 @@ dpkgdivert() {
 	if [[ $watdo = on ]]; then
 		cat <<EOF | sudo tee ${werdo}/dpkgdivert >/dev/null
 #!/bin/sh
-set -x
-exec 2>dpkgdivert.log
-
 dpkg-divert --add --local \
 	--divert /usr/sbin/invoke-rc.d.chroot \
 	--rename /usr/sbin/invoke-rc.d
@@ -232,7 +229,7 @@ EOF
 
 install-custdebs() {
 	fn install-custdebs
-	req=(R strapdir)
+	req=(R strapdir custom_deb_packages)
 	ckreq || return 1
 
 	sudo mkdir -p $strapdir/debs
@@ -240,15 +237,12 @@ install-custdebs() {
 
 	cat <<EOF | sudo tee ${strapdir}/install-debs >/dev/null
 #!/bin/sh
-set -x
-exec 2>custdebs.log
-
 cd /debs
 for deb in ${custom_deb_packages}; do
 	dpkg -i \$deb
 	apt-get --yes --force-yes -f install
 done
-cd -
+cd /
 apt-get autoremove
 apt-get clean
 rm -rf /debs
@@ -258,27 +252,79 @@ EOF
 
 chroot-script() {
 	fn chroot-script "$@"
+	req=(strapdir)
+	ckreq || return 1
 
+	mkdir -p "$R/log"
 	case "x$1" in
 		x-d)
 			local script="$2"
 			devprocsys mount "$strapdir" || zerr
 			dpkgdivert on "$strapdir"    || zerr
+
+			## logging
+			sudo sed -i "$strapdir/$script" \
+				-e 's@#!/bin/sh@#!/bin/sh\'$'\nset -x ; exec 2>/'$script'.log@'
 			notice "chrooting to execute $script..."
 			sudo chmod +x  "$strapdir/$script"    || zerr
 			sudo -E chroot "$strapdir" "/$script" || zerr
+			sudo mv -f "$strapdir/${script}.log" "$R/log/"
+
 			dpkgdivert off "$strapdir"    || zerr
 			devprocsys umount "$strapdir" || zerr
 			;;
 		*)
 			local script="$1"
+
+			## logging
+			sudo sed -i "$strapdir/$script" \
+				-e 's@#!/bin/sh@#!/bin/sh\'$'\nset -x ; exec 2>/'$script'.log@'
+
 			notice "chrooting to execute $script..."
 			sudo chmod +x  "$strapdir/$script" || zerr
 			sudo -E chroot "$strapdir" "/$script" || zerr
+			sudo mv -f "$strapdir/${script}.log" "$R/log/"
 			;;
 	esac
 
 	sudo rm -f $strapdir/$script
+}
+
+install_fake_package() {
+	fn install_fake_package "$@"
+	req=(strapdir pkgname pkgver section)
+	local pkgname="$1"
+	local pkgver="$2"
+	local section="$3"
+	ckreq || return 1
+
+	local _tmp="$strapdir/tmp"
+	sudo mkdir -p "$_tmp/$pkgname"
+
+	cat <<EOF | sudo tee ${_tmp}/${pkgname}/${pkgname}_${pkgver}.control >/dev/null
+Section: ${section}
+Priority: optional
+Homepage: https://devuan.org/
+Standards-Version: 3.9.6
+
+Package: ${pkgname}
+Version: ${pkgver}
+Maintainer: Devuan developers <onelove@devuan.org>
+Architecture: all
+Description: (Fake) ${pkgname}
+  Dummy package used to meet some dependencies without installing the
+  real ${pkgname} package.
+EOF
+
+	cat <<EOF | sudo tee ${strapdir}/install-fake-package >/dev/null
+#!/bin/sh
+cd /tmp/${pkgname}
+equivs-build ${pkgname}_${pkgver}.control \
+	&& dpkg -i ${pkgname}_${pkgver}_all.deb || exit 1
+cd /tmp
+rm -rf ${pkgname}
+EOF
+	chroot-script install-fake-package || zerr
 }
 
 blend_preinst() {

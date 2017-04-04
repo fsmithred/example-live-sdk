@@ -1,0 +1,66 @@
+#!/usr/bin/env zsh
+# config for simple-ice.blend
+
+
+vars+=(username userpass default_shell i386flavor)
+#arrs+=(custom_deb_packages)
+
+blend_name="simple-ice"
+blend_vers="1.0"
+os="$blend_name"
+
+image_name="${blend_name}-${blend_vers}-${arch}"
+
+os="$blend_name"
+release="jessie"
+
+
+username="user"
+userpass="user"
+default_shell="/bin/bash"
+rootcredentials="root:root"
+
+
+base_packages+=(
+
+	grub-pc
+	lsof
+	bash-completion
+	texinfo
+	acpi-support-base
+	aptitude
+	apt-listchanges
+	discover
+	dnsutils
+	doc-debian
+	docutils-common
+	docutils-doc
+	ftp
+	gettext
+	gnupg2
+	laptop-detect
+	mlocate
+	mutt
+	ncurses-term
+	nfs-common
+	procmail
+	reportbug
+	telnet
+	usbutils
+	w3m
+	whois
+)
+
+extra_packages+=(
+
+	xorg
+	xserver-xorg-video-all
+	xterm
+	pmount
+	spacefm
+	lightdm
+	icewm
+	leafpad
+
+)
+

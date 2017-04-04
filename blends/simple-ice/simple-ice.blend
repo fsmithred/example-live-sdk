@@ -1,0 +1,77 @@
+#!/usr/bin/env zsh
+# simple-ice.blend
+
+
+BLENDPATH="${BLENDPATH:-$(dirname $0)}"
+
+source $BLENDPATH/config
+
+blend_preinst() {
+	fn blend_preinst
+	req=(strapdir blend)
+	ckreq || return 1
+
+	notice "executing $blend_name preinst"
+
+	add-user "$username" "$userpass"
+	
+#	notice "copying blend-specific debs"
+#	cp -fv "$BLENDPATH"/*.deb "$R/extra/custom-packages"
+	
+}
+
+
+blend_postinst() {
+	fn blend_postinst
+	req=(strapdir)
+	ckreq || return 1
+
+	notice "executing $blend_name postinst"
+		
+	pushd "$strapdir"
+		sudo rsync -avx "$BLENDPATH"/rootfs-overlay/* . || zerr
+	popd
+
+	blend_finalize || zerr
+}
+
+
+blend_finalize() {
+	fn blend_finalize
+	req=(strapdir)
+	ckreq || return 1
+
+	cat <<EOF | sudo tee ${strapdir}/finalize >/dev/null
+#!/bin/sh
+# finalize
+set -x
+exec 2>finalize.log
+
+
+## perms
+
+	for i in cdrom floppy audio dip video plugdev netdev ; do   # lpadmin scanner  # put this in config file?
+		gpasswd -a "$username" \${i}
+	done
+	
+	chsh -s "$default_shell" "$username"
+	chown -R 1000:1000 /home/"$username"
+
+	
+# remove fstab for iso. This should probably be in iso_prepare_strap
+rm -f /etc/fstab
+
+
+## cleanup
+
+#apt-get --yes --force-yes purge ${finalize_purge_packages}
+#apt-get --yes --force-yes autoremove
+apt-get clean
+updatedb
+EOF
+	chroot-script finalize || zerr
+	
+#	sudo chmod 666 "$strapdir"/*.log
+#	sudo mv "$strapdir"/*.log "$BLENDPATH"
+	
+}

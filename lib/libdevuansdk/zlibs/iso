@@ -89,8 +89,8 @@ iso_squash_strap() {
 	notice "creating squashfs out of strapdir"
 
 	pushd $workdir
-	sudo mksquashfs $strapdir binary/live/filesystem.squashfs -noappend \
-		-comp xz -e boot || zerr
+	sudo mksquashfs $strapdir binary/live/filesystem.squashfs \
+		-noappend -comp xz || zerr
 	popd
 }
 
