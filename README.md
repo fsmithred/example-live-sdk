@@ -11,7 +11,7 @@ Where to start?
 
 It is possible to build without using a blend. This is described in the Quick start section of the original readme attached below. This will create a small cli-only live iso. To customize a build, create a blend.
 
-Blends each get their own directory in live-sdk/blends. Inside each individual blend file are all the instructions and components that are unique to that blend. This includes a config file, a blend file, overlay files, and custom packages. Take a look at the example blends in this repository.
+Blends each get their own directory in live-sdk/blends. Inside each individual blend directory are all the instructions and components that are unique to that blend. This includes a config file, a blend file, overlay files, and custom packages. Take a look at the example blends in this repository.
 
 
 
