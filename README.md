@@ -15,7 +15,7 @@ Blends each get their own directory in live-sdk/blends. Inside each individual b
 
 
 
-Run the build with the following commands from the live-sdk directory. Change <arch> to amd64 or i386. 
+Run the build with the following commands from the live-sdk directory. Change \<arch\> to amd64 or i386. 
 
 	zsh -f
 	source sdk
