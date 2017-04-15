@@ -50,7 +50,7 @@ exec 2>finalize.log
 
 ## perms
 
-	for i in cdrom floppy audio dip video plugdev netdev ; do   # lpadmin scanner  # put this in config file?
+	for i in cdrom floppy audio dip video plugdev netdev ; do
 		gpasswd -a "$username" \${i}
 	done
 	
@@ -70,8 +70,5 @@ apt-get clean
 updatedb
 EOF
 	chroot-script finalize || zerr
-	
-#	sudo chmod 666 "$strapdir"/*.log
-#	sudo mv "$strapdir"/*.log "$BLENDPATH"
 	
 }

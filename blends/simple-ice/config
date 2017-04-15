@@ -7,21 +7,20 @@ vars+=(username userpass default_shell i386flavor)
 
 blend_name="simple-ice"
 blend_vers="1.0"
-os="$blend_name"
 
 image_name="${blend_name}-${blend_vers}-${arch}"
 
 os="$blend_name"
 release="jessie"
 
-
 username="user"
 userpass="user"
 default_shell="/bin/bash"
-rootcredentials="root:root"
+#rootcredentials="root:some-other-password"
 
 
-base_packages+=(
+
+extra_packages+=(
 
 	grub-pc
 	lsof
@@ -49,18 +48,13 @@ base_packages+=(
 	usbutils
 	w3m
 	whois
-)
-
-extra_packages+=(
-
 	xorg
 	xserver-xorg-video-all
 	xterm
-	pmount
 	spacefm
-	lightdm
 	icewm
 	leafpad
-
+	lightdm
+	pmount
 )
 
