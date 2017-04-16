@@ -16,7 +16,7 @@ release="jessie"
 username="user"
 userpass="user"
 default_shell="/bin/bash"
-#rootcredentials="root:some-other-password"
+#rootcredentials="root:mypassword"
 
 
 
