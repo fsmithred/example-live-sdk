@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # config for jessie-oblx.blend
 
-vars+=(username userpass default_shell efi_work)
+vars+=(username userpass default_shell efi_work mkefi)
 arrs+=(custom_deb_packages)
 
 blend_name="jessie-oblx"
@@ -10,8 +10,11 @@ os="$blend_name"
 
 image_name="${blend_name}-${blend_vers}-${arch}"
 
+# Uncomment to keep a separate bootstrap tarball for each blend.
 os="$blend_name"
-release="jessie"
+
+# Uncomment and change to ascii at your own risk.
+#release="jessie"
 
 
 username="user"
@@ -20,15 +23,50 @@ default_shell="/bin/bash"
 rootcredentials="root:root"
 
 
-# If you don't want uefi, comment out this line
-# and line 30 of jessie-oblx.blend, and change
-# grub-efi-amd64 below to grub-pc
-efi_work="$R/extra/efi-files"
+# uncomment to create uefi-bootable iso 
+mkefi="yes"
+efi_work="$BLENDPATH/efi-files"
+
+# grubversion doesn't matter for booting the live iso.
+# Use the version of grub that you want to install to hard drive,
+# or have grub deb packages available inside the live system.
+#grubversion="grub-pc"
+grubversion="grub-efi-amd64"
 
 
 #####  To exclude recommends: lines 101 and 161 in zlibs/bootstrap.
 
-base_packages+=(grub-efi-amd64)
+
+base_packages+=(
+
+	bash-completion
+	texinfo
+	acpi-support-base
+	aptitude
+	apt-listchanges
+	discover
+	dnsutils
+	doc-debian
+	docutils-common
+	docutils-doc
+	ftp
+	gettext
+	gnupg2
+	$grubversion
+	laptop-detect
+	lsof
+	mlocate
+	mutt
+	ncurses-term
+	nfs-common
+	procmail
+	reportbug
+	telnet
+	usbutils
+	w3m
+	whois
+)
+
 
 extra_packages+=(
 
@@ -92,7 +130,12 @@ extra_packages+=(
 )
 
 
-purge_packages+=(
+# Replace the default purge_packages list if you want to keep dbus.
+# or add any packages you want to purge.
+#
+# purge_packages=()
+
+purge_packages=(
 	libsystemd0
 )
 
@@ -108,11 +151,9 @@ custom_deb_packages+=(yad_0.27.0-1_amd64.deb palemoon_27.2.0~repack-1_amd64.deb)
 
 custom_deb_packages+=(
 	firemenu-1.2.deb
-	live-config-refracta_0.0.5.deb
-	refracta-lang_1.1.deb
 	refracta2usb-2.3.6.deb
 	refractainstaller-base_9.2.1_all.deb
-	refractainstaller-gui_9.2.1_all.deb
+	refractainstaller-gui_9.2.2_all.deb
 	refractasnapshot-base_10.0.2_all.deb
 	refractasnapshot-gui_10.0.2_all.deb
 	usbpmount-1.2+blend.deb

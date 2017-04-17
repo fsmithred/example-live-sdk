@@ -27,7 +27,9 @@ blend_postinst() {
 
 	notice "executing $blend_name postinst"
 	
-	iso_make_efi
+	if [[ $mkefi = yes ]] ; then
+		iso_make_efi
+	fi
 
 	install-custdebs || zerr
 	pushd "$strapdir"
@@ -306,11 +308,6 @@ exec 2>finalize.log
 	cp /etc/skel/.bashrc /home/"$username"
 	chown -R 1000:1000 /home/"$username"
 
-	
-	
-# What's this? Do I need it?
-rm -rf /usr/local/share/zsh/site-functions
-
 
 # remove fstab for iso. This should probably be in iso_prepare_strap
 rm -f /etc/fstab
@@ -318,15 +315,11 @@ rm -f /etc/fstab
 
 ## cleanup
 
-#apt-get --yes --force-yes purge ${finalize_purge_packages}
 #apt-get --yes --force-yes autoremove
 apt-get clean
 /usr/bin/updatedb
 EOF
 	chroot-script finalize || zerr
-	
-	sudo chmod 666 "$strapdir"/*.log
-	sudo mv "$strapdir"/*.log "$BLENDPATH"
 	
 }
 
